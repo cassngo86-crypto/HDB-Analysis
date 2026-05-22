@@ -1,4 +1,5 @@
 import streamlit as st
+import os
 import plotly.express as px
 import pandas as pd
 from engine import RealEstateEngine
@@ -17,17 +18,34 @@ st.set_page_config(page_title="HDB Asset Valuation Engine", layout="wide")
 st.title("🏠 Real Estate Asset Valuation & Lease Decay Engine")
 st.markdown("Automated algorithmic scoping for Singapore HDB resale trends.")
 
-# 2. Initialize and Load the Data Engine Safely
+
+# 1. Construct a robust, absolute file path helper
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_PATH = os.path.join(BASE_DIR, "hdb_resale_flats.csv")
+
+# 2. Initialize and Load the Data Engine Safely using Caching
 @st.cache_resource
 def load_hdb_engine():
-    # This expects hdb_resale_flats.csv to be in the exact same folder
-    engine = RealEstateEngine("hdb_resale_flats.csv")
+    # Defensive check: Show a helpful message in the browser instead of crashing the server
+    if not os.path.exists(DATA_PATH):
+        st.error(f"⚠️ Dataset File Missing! Could not locate '{DATA_PATH}' in your repository.")
+        st.info("💡 Solution: Ensure 'hdb_resale_flats.csv' is saved in your main project folder and pushed to GitHub via VS Code.")
+        st.stop() # Safely stalls the interface execution smoothly
+        
+    engine = RealEstateEngine(DATA_PATH)
     engine.load_and_clean_data()
     return engine
 
-# Create the engine and extract the data frame
-engine = RealEstateEngine("hdb_resale_flats.csv")
-cleaned_df = engine.load_and_clean_data()
+# 3. Call the cached function safely to extract your working variables
+try:
+    engine = load_hdb_engine()
+    # Assuming your engine stores the processed dataframe as an attribute or returns it
+    # If your engine.load_and_clean_data() returns the dataframe, we fetch it via the engine reference
+    cleaned_df = engine.df if hasattr(engine, 'df') else engine.load_and_clean_data()
+except Exception as e:
+    st.error(f"❌ Initialization Error: {str(e)}")
+    st.stop()
+
 # --- NEW: ADVANCED FEATURE ENGINEERING DIRECTLY IN APP ---
 # Helper function for floor midpoint calculation
 def clean_storey(storey_str):
