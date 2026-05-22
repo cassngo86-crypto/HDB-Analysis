@@ -22,14 +22,9 @@ st.set_page_config(
 ACCESSIBLE_PALETTE = ["#0072B2", "#E69F00", "#009E73", "#D55E00", "#CC79A7", "#56B4E9"]
 
 st.title("🏢 Singapore HDB Resale Price Analytics & Prediction")
-st.markdown("""
-This interactive system provides historical HDB transaction insights along with a live-trained 
-Machine Learning regression model to estimate current valuation parameters.
-""")
-st.write("---")
 
 # -----------------------------------------------------------------------------
-# 2. OPTIMIZED DATA LOADING PIPELINE (CACHED)
+# 2. OPTIMIZED DATA LOADING PIPELINE (WITH TIMELINE EXTRACTION)
 # -----------------------------------------------------------------------------
 @st.cache_data(ttl=3600, show_spinner="Loading HDB transaction dataset...")
 def load_data(file_path):
@@ -45,6 +40,7 @@ def load_data(file_path):
             
     if 'month' in df.columns:
         df['year'] = df['month'].apply(lambda x: int(str(x).split('-')[0]) if '-' in str(x) else x)
+        df = df.sort_values('month').reset_index(drop=True)
         
     return df
 
@@ -55,6 +51,20 @@ if raw_df is None:
     st.error(f"❌ Critical Error: File '{CSV_FILENAME}' not found at root layout level.")
     st.stop()
 
+# Dynamic Date Coverage Banner Output
+if 'month' in raw_df.columns and not raw_df.empty:
+    min_month = raw_df['month'].min()
+    max_month = raw_df['month'].max()
+    st.info(f"🗓️ **Dataset Coverage Period:** {min_month} to {max_month}")
+else:
+    st.info("🗓️ **Dataset Coverage Period:** Timeline data processing...")
+
+st.markdown("""
+This interactive system provides historical HDB transaction insights along with a live-trained 
+Machine Learning regression model to estimate current valuation parameters.
+""")
+st.write("---")
+
 # -----------------------------------------------------------------------------
 # 3. MACHINE LEARNING MODEL TRAINING PIPELINE (CACHED RESOURCING)
 # -----------------------------------------------------------------------------
@@ -64,7 +74,6 @@ def train_prediction_model(df):
     if not all(col in df.columns for col in features + ['resale_price']):
         return None, None
     
-    # Filter rows without missing targets
     model_df = df[features + ['resale_price']].dropna()
     X = model_df[features]
     y = model_df['resale_price']
@@ -72,14 +81,12 @@ def train_prediction_model(df):
     categorical_features = ['town', 'flat_type']
     numeric_features = ['floor_area_sqm', 'lease_commence_date']
     
-    # Preprocessor pipelines for categorical and numerical features
     preprocessor = ColumnTransformer(
         transformers=[
             ('num', 'passthrough', numeric_features),
             ('cat', OneHotEncoder(handle_unknown='ignore'), categorical_features)
         ])
     
-    # Using Ridge regression for stability and multi-collinearity safety parameters
     pipeline = Pipeline(steps=[
         ('preprocessor', preprocessor),
         ('regressor', Ridge(alpha=1.0))
@@ -89,11 +96,10 @@ def train_prediction_model(df):
     r2_score = pipeline.score(X, y)
     return pipeline, r2_score
 
-# Initialize the regression pipeline engine
 model_pipeline, model_r2 = train_prediction_model(raw_df)
 
 # -----------------------------------------------------------------------------
-# 4. TAB NAVIGATION STRATEGY
+# 4. TAB NAVIGATION WORKSPACE
 # -----------------------------------------------------------------------------
 tab1, tab2 = st.tabs(["📊 Market Analytics Dashboard", "🔮 AI Price Predictor (Regression Model)"])
 
@@ -101,7 +107,7 @@ tab1, tab2 = st.tabs(["📊 Market Analytics Dashboard", "🔮 AI Price Predicto
 # TAB 1: HISTORICAL DATA MARKET ANALYSIS
 # -----------------------------------------------------------------------------
 with tab1:
-    st.subheader("🔍 Historical Insights Filter Workspace")
+    st.subheader("🔍 Filter Options")
     
     all_towns = sorted(raw_df['town'].unique()) if 'town' in raw_df.columns else []
     all_flat_types = sorted(raw_df['flat_type'].unique()) if 'flat_type' in raw_df.columns else []
@@ -118,16 +124,24 @@ with tab1:
     if selected_flat_types:
         filtered_df = filtered_df[filtered_df['flat_type'].isin(selected_flat_types)]
         
+    # -------------------------------------------------------------------------
+    # SECTION 4: EXECUTIVE SUMMARY METRICS BANNER (UPDATED)
+    # -------------------------------------------------------------------------
+    st.write("---")
     if not filtered_df.empty:
         total_transactions = len(filtered_df)
         avg_price = filtered_df['resale_price'].mean() if 'resale_price' in filtered_df.columns else 0.0
         avg_psf = (filtered_df['resale_price'] / filtered_df['floor_area_sqm']).mean() if 'floor_area_sqm' in filtered_df.columns and 'resale_price' in filtered_df.columns else 0.0
         
+        # Displaying the 3-Column Calculation Grid
         c1, c2, c3 = st.columns(3)
         c1.metric(label="Total Transacted Units", value=f"{total_transactions:,}")
         c2.metric(label="Average Resale Price", value=f"${avg_price:,.2f}")
         c3.metric(label="Average Price Per SQM", value=f"${avg_psf:,.2f} / sqm")
         
+        # ---------------------------------------------------------------------
+        # 5. DATA VISUALIZATION PORTALS
+        # ---------------------------------------------------------------------
         st.write("---")
         l_col1, l_col2 = st.columns(2)
         
@@ -143,6 +157,9 @@ with tab1:
             fig_scatter.update_layout(legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
             st.plotly_chart(fig_scatter, use_container_width=True)
             
+        # ---------------------------------------------------------------------
+        # 6. RAW COMPREHENSIVE DATA ENGINE VIEW
+        # ---------------------------------------------------------------------
         st.write("---")
         st.subheader("📋 Filtered Transaction Ledger Data")
         st.dataframe(
@@ -155,7 +172,7 @@ with tab1:
             use_container_width=True, hide_index=True
         )
     else:
-        st.warning("⚠️ No records match selection filters.")
+        st.warning("⚠️ No records match selection filters. Please adjust your criteria.")
 
 # -----------------------------------------------------------------------------
 # TAB 2: REGRESSION PREDICTION MODEL INTERFACE
@@ -169,10 +186,9 @@ with tab2:
     if model_pipeline is None:
         st.error("Could not initialize regression model. Missing structural tracking parameters in dataset columns.")
     else:
-        # Inform user about metrics using clear LaTeX notation
-        #st.info(f"📈 **Model Diagnostic Stat:** The Ridge regression model is active with a Coefficient of Determination $R^2 = {model_r2:.4f}$.")
-        
+        # Polished Model Stat Display using clean inline LaTeX notation
         st.info(f"📈 **Model Diagnostic Stat:** The Ridge regression model is active with a Coefficient of Determination ($R^2$) of **{model_r2:.4f}**.")
+        
         st.markdown("### 🔧 Input Target Flat Specifications")
         
         col_in1, col_in2 = st.columns(2)
