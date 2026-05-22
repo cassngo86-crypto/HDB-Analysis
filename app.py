@@ -19,32 +19,43 @@ st.title("🏠 Real Estate Asset Valuation & Lease Decay Engine")
 st.markdown("Automated algorithmic scoping for Singapore HDB resale trends.")
 
 
-# 1. Construct a robust, absolute file path helper
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_PATH = os.path.join(BASE_DIR, "hdb_resale_flats.csv")
+import os
+import streamlit as st
+# Make sure your engine import is at the top
+from engine import RealEstateEngine  
 
-# 2. Initialize and Load the Data Engine Safely using Caching
+# 1. Dynamically find the absolute path to your folder on the Streamlit server
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CSV_FILE_NAME = "hdb_resale_flats.csv"
+FULL_DATA_PATH = os.path.join(BASE_DIR, CSV_FILE_NAME)
+
+# 2. Setup the Caching Engine Safely
 @st.cache_resource
 def load_hdb_engine():
-    # Defensive check: Show a helpful message in the browser instead of crashing the server
-    if not os.path.exists(DATA_PATH):
-        st.error(f"⚠️ Dataset File Missing! Could not locate '{DATA_PATH}' in your repository.")
-        st.info("💡 Solution: Ensure 'hdb_resale_flats.csv' is saved in your main project folder and pushed to GitHub via VS Code.")
-        st.stop() # Safely stalls the interface execution smoothly
+    # Double check that the server can see the file before feeding it to the engine
+    if not os.path.exists(FULL_DATA_PATH):
+        st.error(f"⚠️ Server path mismatch! Engine cannot find: {FULL_DATA_PATH}")
+        st.stop()
         
-    engine = RealEstateEngine(DATA_PATH)
+    # Initialize your engine using the verified path
+    engine = RealEstateEngine(FULL_DATA_PATH)
     engine.load_and_clean_data()
     return engine
 
-# 3. Call the cached function safely to extract your working variables
+# 3. Initialize your app variables safely
 try:
     engine = load_hdb_engine()
-    # Assuming your engine stores the processed dataframe as an attribute or returns it
-    # If your engine.load_and_clean_data() returns the dataframe, we fetch it via the engine reference
-    cleaned_df = engine.df if hasattr(engine, 'df') else engine.load_and_clean_data()
+    # Safely retrieve your dataframe from the cached engine
+    if hasattr(engine, 'df'):
+        cleaned_df = engine.df
+    else:
+        cleaned_df = engine.load_and_clean_data()
 except Exception as e:
-    st.error(f"❌ Initialization Error: {str(e)}")
+    st.error(f"❌ RealEstateEngine Initialization Failed: {str(e)}")
+    st.info("💡 If this is a parsing error, ensure engine.py reads the path variable correctly.")
     st.stop()
+
+# --- Your remaining sidebar and dashboard layout code continues below ---
 
 # --- NEW: ADVANCED FEATURE ENGINEERING DIRECTLY IN APP ---
 # Helper function for floor midpoint calculation
