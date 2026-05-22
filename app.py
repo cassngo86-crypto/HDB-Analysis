@@ -20,39 +20,52 @@ st.markdown("Automated algorithmic scoping for Singapore HDB resale trends.")
 
 import os
 import streamlit as st
+import pandas as pd
 
-# 1. Lock root environment paths 
+# 1. Lock environmental tracking path context
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 os.chdir(BASE_DIR)
 
-# 2. Halt if the CSV file isn't found in the workspace container
+# 2. Halt if dataset file container is missing
 CSV_FILE_NAME = "hdb_resale_flats.csv"
 if not os.path.exists(CSV_FILE_NAME):
-    st.error(f"⚠️ Dataset File Missing! Could not locate '{CSV_FILE_NAME}' in your repository.")
+    st.error(f"⚠️ Dataset File Missing! Could not find '{CSV_FILE_NAME}' in your repository.")
     st.stop()
 
-# 3. Dynamic import tracking to catch engine compilation errors
+# 💡 EMERGENCY MEMORY GUARD: Let's create a trimmed down sample file if the main one is too heavy
+# This reads only the first 15,000 rows to see if the server can boot up successfully!
+SAMPLE_CSV = "hdb_sample_flats.csv"
+if not os.path.exists(SAMPLE_CSV):
+    try:
+        # Read a manageable chunk of your data and save it as a lightweight temporary file
+        small_df = pd.read_csv(CSV_FILE_NAME, nrows=15000)
+        small_df.to_csv(SAMPLE_CSV, index=False)
+    except Exception as e:
+        st.error(f"Failed to downsample data: {str(e)}")
+        st.stop()
+
+# 3. Import your engine 
 try:
     from engine import RealEstateEngine
 except Exception as e:
-    st.error(f"❌ Failed to import engine.py module structure: {str(e)}")
+    st.error(f"❌ Engine Import Error: {str(e)}")
     st.stop()
 
-# 4. Safe cached engine initialization
+# 4. Initialize using our new lightweight sample data file
 @st.cache_resource
 def load_hdb_engine():
     try:
-        engine = RealEstateEngine(CSV_FILE_NAME)
+        # Feed the sample file to your engine to keep memory usage under 1GB
+        engine = RealEstateEngine(SAMPLE_CSV)
         engine.load_and_clean_data()
         return engine
     except Exception as e:
-        st.error(f"❌ Error during training engine data clean cycle: {str(e)}")
+        st.error(f"❌ Error during training engine clean cycle: {str(e)}")
         st.stop()
 
 engine = load_hdb_engine()
 cleaned_df = engine.df if hasattr(engine, 'df') else engine.load_and_clean_data()
 
-# --- Rest of your visual UI components go below ---
 
 # --- NEW: ADVANCED FEATURE ENGINEERING DIRECTLY IN APP ---
 # Helper function for floor midpoint calculation
