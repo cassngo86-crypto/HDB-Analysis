@@ -192,20 +192,9 @@ with tab1:
         st.warning("⚠️ No records match selection filters. Please adjust your criteria.")
 
 # -----------------------------------------------------------------------------
-# TAB 2: REGRESSION PREDICTION MODEL INTERFACE
-# -----------------------------------------------------------------------------
-with tab2:
-    st.subheader("🔮 Machine Learning Value Estimation")
-    st.markdown("""
-    This regression model is trained dynamically on your actual dataset. It learns historical transaction weights to estimate a resale price based on property parameters.
-    """)
-    
-    if model_pipeline is None:
-        st.error("Could not initialize regression model. Missing structural tracking parameters in dataset columns.")
-    else:
-        # Polished Model Stat Display using clean inline LaTeX notation
-        st.info(f"📈 **Model Diagnostic Stat:** The Ridge regression model is active with a Coefficient of Determination ($R^2$) of **{model_r2:.4f}**.")
-        
+# ---------------------------------------------------------------------
+        # TAB 2: DYNAMIC PARAMETER SELECTION
+        # ---------------------------------------------------------------------
         st.markdown("### 🔧 Input Target Flat Specifications")
         
         col_in1, col_in2 = st.columns(2)
@@ -214,17 +203,34 @@ with tab2:
             pred_flat_type = st.selectbox("Target Flat Configuration:", options=sorted(raw_df['flat_type'].unique()))
             
         with col_in2:
-            min_area = int(raw_df['floor_area_sqm'].min()) if 'floor_area_sqm' in raw_df.columns else 30
-            max_area = int(raw_df['floor_area_sqm'].max()) if 'floor_area_sqm' in raw_df.columns else 200
-            mean_area = int(raw_df['floor_area_sqm'].mean()) if 'floor_area_sqm' in raw_df.columns else 90
+            # Filter dataset to extract ranges ONLY for the selected flat type
+            type_specific_df = raw_df[raw_df['flat_type'] == pred_flat_type]
             
-            pred_area = st.slider("Floor Area (Square Meters):", min_value=min_area, max_value=max_area, value=mean_area)
+            if not type_specific_df.empty:
+                min_area = int(type_specific_df['floor_area_sqm'].min())
+                max_area = int(type_specific_df['floor_area_sqm'].max())
+                mean_area = int(type_specific_df['floor_area_sqm'].mean())
+            else:
+                # Safe fallback if empty
+                min_area, max_area, mean_area = 30, 200, 90
             
+            # If min and max happen to be identical, pad them to prevent Streamlit slider crash
+            if min_area == max_area:
+                max_area += 5
+                
+            # Dynamic Slider: Updates its range automatically when the flat type changes!
+            pred_area = st.slider(
+                f"Floor Area for {pred_flat_type} (Square Meters):", 
+                min_value=min_area, 
+                max_value=max_area, 
+                value=mean_area
+            )
+            
+            # Lease slider constraints remain standard
             min_lease = int(raw_df['lease_commence_date'].min()) if 'lease_commence_date' in raw_df.columns else 1966
             max_lease = int(raw_df['lease_commence_date'].max()) if 'lease_commence_date' in raw_df.columns else 2026
             
             pred_lease = st.slider("Lease Commencement Year:", min_value=min_lease, max_value=max_lease, value=max_lease-10)
-            
         st.write("---")
         
         # Build DataFrame for prediction matching pipeline schema requirements
