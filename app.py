@@ -193,8 +193,21 @@ with tab1:
 
 # -----------------------------------------------------------------------------
 # ---------------------------------------------------------------------
-        # TAB 2: DYNAMIC PARAMETER SELECTION
-        # ---------------------------------------------------------------------
+ # -----------------------------------------------------------------------------
+# TAB 2: REGRESSION PREDICTION MODEL INTERFACE
+# -----------------------------------------------------------------------------
+with tab2:
+    st.subheader("🔮 Machine Learning Value Estimation")
+    st.markdown("""
+    This regression model is trained dynamically on your actual dataset. It learns historical transaction weights to estimate a resale price based on property parameters.
+    """)
+    
+    if model_pipeline is None:
+        st.error("Could not initialize regression model. Missing structural tracking parameters in dataset columns.")
+    else:
+        # Polished Model Stat Display using clean inline LaTeX notation
+        st.info(f"📈 **Model Diagnostic Stat:** The Ridge regression model is active with a Coefficient of Determination ($R^2$) of **{model_r2:.4f}**.")
+        
         st.markdown("### 🔧 Input Target Flat Specifications")
         
         col_in1, col_in2 = st.columns(2)
@@ -214,11 +227,11 @@ with tab1:
                 # Safe fallback if empty
                 min_area, max_area, mean_area = 30, 200, 90
             
-            # If min and max happen to be identical, pad them to prevent Streamlit slider crash
+            # Prevent Streamlit slider crash if min == max
             if min_area == max_area:
                 max_area += 5
                 
-            # Dynamic Slider: Updates its range automatically when the flat type changes!
+            # Dynamic Slider: Range dynamically adjusts when flat type changes
             pred_area = st.slider(
                 f"Floor Area for {pred_flat_type} (Square Meters):", 
                 min_value=min_area, 
@@ -231,6 +244,7 @@ with tab1:
             max_lease = int(raw_df['lease_commence_date'].max()) if 'lease_commence_date' in raw_df.columns else 2026
             
             pred_lease = st.slider("Lease Commencement Year:", min_value=min_lease, max_value=max_lease, value=max_lease-10)
+            
         st.write("---")
         
         # Build DataFrame for prediction matching pipeline schema requirements
@@ -255,4 +269,5 @@ with tab1:
                 historical_avg = baseline_match['resale_price'].mean()
                 st.markdown(f"<p style='text-align: center; color: gray;'>Historical empirical base average for a {pred_flat_type} in {pred_town} is <b>${historical_avg:,.2f} SGD</b></p>", unsafe_allow_html=True)
         except Exception as pred_err:
-            st.error(f"Prediction Pipeline Exception: {pred_err}")
+            st.error(f"Prediction Pipeline Exception: {pred_err}")   
+       
