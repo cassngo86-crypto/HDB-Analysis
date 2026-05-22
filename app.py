@@ -170,8 +170,9 @@ with tab2:
         st.error("Could not initialize regression model. Missing structural tracking parameters in dataset columns.")
     else:
         # Inform user about metrics using clear LaTeX notation
-        st.info(f"📈 **Model Diagnostic Stat:** The Ridge regression model is active with a Coefficient of Determination $R^2 = {model_r2:.4f}$.")
+        #st.info(f"📈 **Model Diagnostic Stat:** The Ridge regression model is active with a Coefficient of Determination $R^2 = {model_r2:.4f}$.")
         
+        st.info(f"📈 **Model Diagnostic Stat:** The Ridge regression model is active with a Coefficient of Determination ($R^2$) of **{model_r2:.4f}**.")
         st.markdown("### 🔧 Input Target Flat Specifications")
         
         col_in1, col_in2 = st.columns(2)
