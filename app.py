@@ -269,5 +269,4 @@ with tab2:
                 historical_avg = baseline_match['resale_price'].mean()
                 st.markdown(f"<p style='text-align: center; color: gray;'>Historical empirical base average for a {pred_flat_type} in {pred_town} is <b>${historical_avg:,.2f} SGD</b></p>", unsafe_allow_html=True)
         except Exception as pred_err:
-            st.error(f"Prediction Pipeline Exception: {pred_err}")   
-       
+            st.error(f"Prediction Pipeline Exception: {pred_err}")
