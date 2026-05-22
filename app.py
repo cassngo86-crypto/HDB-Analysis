@@ -18,44 +18,43 @@ st.set_page_config(page_title="HDB Asset Valuation Engine", layout="wide")
 st.title("🏠 Real Estate Asset Valuation & Lease Decay Engine")
 st.markdown("Automated algorithmic scoping for Singapore HDB resale trends.")
 
-
 import os
 import streamlit as st
-# Make sure your engine import is at the top
-from engine import RealEstateEngine  
 
-# 1. Dynamically find the absolute path to your folder on the Streamlit server
+# 1. Force the system execution directory to stay locked onto your app's home folder root
+# This forces ANY read_csv inside engine.py to look in the right place!
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+os.chdir(BASE_DIR)
+
+# 2. Defensive Check: Stop immediately if the dataset isn't there, before importing your engine
 CSV_FILE_NAME = "hdb_resale_flats.csv"
-FULL_DATA_PATH = os.path.join(BASE_DIR, CSV_FILE_NAME)
-
-# 2. Setup the Caching Engine Safely
-@st.cache_resource
-def load_hdb_engine():
-    # Double check that the server can see the file before feeding it to the engine
-    if not os.path.exists(FULL_DATA_PATH):
-        st.error(f"⚠️ Server path mismatch! Engine cannot find: {FULL_DATA_PATH}")
-        st.stop()
-        
-    # Initialize your engine using the verified path
-    engine = RealEstateEngine(FULL_DATA_PATH)
-    engine.load_and_clean_data()
-    return engine
-
-# 3. Initialize your app variables safely
-try:
-    engine = load_hdb_engine()
-    # Safely retrieve your dataframe from the cached engine
-    if hasattr(engine, 'df'):
-        cleaned_df = engine.df
-    else:
-        cleaned_df = engine.load_and_clean_data()
-except Exception as e:
-    st.error(f"❌ RealEstateEngine Initialization Failed: {str(e)}")
-    st.info("💡 If this is a parsing error, ensure engine.py reads the path variable correctly.")
+if not os.path.exists(CSV_FILE_NAME):
+    st.error(f"⚠️ Dataset File Missing! Could not find '{CSV_FILE_NAME}' in your repository root.")
+    st.info("💡 Make sure you didn't name the file differently (e.g. capitalized .CSV).")
     st.stop()
 
-# --- Your remaining sidebar and dashboard layout code continues below ---
+# 3. Safe Import: Only import the engine AFTER the path environment is safely handled
+try:
+    from engine import RealEstateEngine
+except Exception as import_error:
+    st.error(f"❌ Failed to import engine script: {str(import_error)}")
+    st.stop()
+
+# 4. Setup the Caching Engine
+@st.cache_resource
+def load_hdb_engine():
+    try:
+        # Pass the plain string filename since os.chdir() has fixed the root directory context
+        engine = RealEstateEngine(CSV_FILE_NAME)
+        engine.load_and_clean_data()
+        return engine
+    except Exception as e:
+        st.error(f"❌ Error during data layout cleaning: {str(e)}")
+        st.stop()
+
+# 5. Initialize your app data frame variables safely
+engine = load_hdb_engine()
+cleaned_df = engine.df if hasattr(engine, 'df') else engine.load_and_clean_data()
 
 # --- NEW: ADVANCED FEATURE ENGINEERING DIRECTLY IN APP ---
 # Helper function for floor midpoint calculation
