@@ -23,8 +23,9 @@ ACCESSIBLE_PALETTE = ["#0072B2", "#E69F00", "#009E73", "#D55E00", "#CC79A7", "#5
 
 st.title("🏢 Singapore HDB Resale Price Analytics & Prediction")
 
+
 # -----------------------------------------------------------------------------
-# 2. OPTIMIZED DATA LOADING PIPELINE (WITH TIMELINE EXTRACTION)
+# 2. OPTIMIZED DATA LOADING PIPELINE (WITH LEASE FALLBACK CALCULATOR)
 # -----------------------------------------------------------------------------
 @st.cache_data(ttl=3600, show_spinner="Loading HDB transaction dataset...")
 def load_data(file_path):
@@ -38,32 +39,34 @@ def load_data(file_path):
         if col in df.columns:
             df[col] = df[col].astype(str).str.upper().str.strip()
             
+    # Parse transaction year safely
     if 'month' in df.columns:
-        df['year'] = df['month'].apply(lambda x: int(str(x).split('-')[0]) if '-' in str(x) else x)
+        df['year'] = df['month'].apply(lambda x: int(str(x).split('-')[0]) if '-' in str(x) else int(x))
         df = df.sort_values('month').reset_index(drop=True)
+    
+    # --- AUTOMATIC REMAINING LEASE FALLBACK GENERATOR ---
+    if 'remaining_lease' in df.columns:
+        # Convert column to string to safely check for nulls or "NONE" text strings
+        df['remaining_lease_clean'] = df['remaining_lease'].astype(str).str.upper().str.strip()
+        
+        # Conditions where the column contains invalid data
+        is_missing = df['remaining_lease_clean'].isna() | (df['remaining_lease_clean'] == 'NONE') | (df['remaining_lease_clean'] == 'NAN')
+        
+        if is_missing.any() and 'year' in df.columns and 'lease_commence_date' in df.columns:
+            # Mathematical fallback: 99 - (Transaction Year - Lease Commence Year)
+            calculated_lease = 99 - (df['year'] - df['lease_commence_date'])
+            
+            # Use calculated lease if missing, otherwise keep what was there originally
+            df['remaining_lease'] = df.apply(
+                lambda row: f"{int(99 - (row['year'] - row['lease_commence_date']))} years" 
+                if str(row['remaining_lease']).strip().upper() in ['NONE', 'NAN', ''] 
+                else row['remaining_lease'], 
+                axis=1
+            )
+        # Drop the temporary text cleaning column
+        df = df.drop(columns=['remaining_lease_clean'])
         
     return df
-
-CSV_FILENAME = "hdb_resale_flats.csv"
-raw_df = load_data(CSV_FILENAME)
-
-if raw_df is None:
-    st.error(f"❌ Critical Error: File '{CSV_FILENAME}' not found at root layout level.")
-    st.stop()
-
-# Dynamic Date Coverage Banner Output
-if 'month' in raw_df.columns and not raw_df.empty:
-    min_month = raw_df['month'].min()
-    max_month = raw_df['month'].max()
-    st.info(f"🗓️ **Dataset Coverage Period:** {min_month} to {max_month}")
-else:
-    st.info("🗓️ **Dataset Coverage Period:** Timeline data processing...")
-
-st.markdown("""
-This interactive system provides historical HDB transaction insights along with a live-trained 
-Machine Learning regression model to estimate current valuation parameters.
-""")
-st.write("---")
 
 # -----------------------------------------------------------------------------
 # 3. MACHINE LEARNING MODEL TRAINING PIPELINE (CACHED RESOURCING)
