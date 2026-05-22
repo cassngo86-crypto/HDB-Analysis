@@ -64,3 +64,12 @@ class RealEstateEngine:
         # Calculate baseline "Fresh Lease" Price per SQM (adjusted for lease age)
         # This lets you see what the flat would be worth if it had a fresh 99-year lease
         df['lease_adjusted_ppsm'] = df['price_per_sqm'] / (df['balas_retention_pct'] / 100) 
+        # ... all your existing class RealEstateEngine code stays exactly the same ...
+
+# 🛡️ THE NAME SHIELD: This prevents the code from running when imported by app.py
+if __name__ == "__main__":
+    # Move ANY local testing, printing, or sample execution code here
+    print("Running engine testing locally...")
+    engine = RealEstateEngine("hdb_resale_flats.csv")
+    df = engine.load_and_clean_data()
+    print(df.head())

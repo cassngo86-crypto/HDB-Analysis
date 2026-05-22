@@ -21,40 +21,38 @@ st.markdown("Automated algorithmic scoping for Singapore HDB resale trends.")
 import os
 import streamlit as st
 
-# 1. Force the system execution directory to stay locked onto your app's home folder root
-# This forces ANY read_csv inside engine.py to look in the right place!
+# 1. Lock root environment paths 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 os.chdir(BASE_DIR)
 
-# 2. Defensive Check: Stop immediately if the dataset isn't there, before importing your engine
+# 2. Halt if the CSV file isn't found in the workspace container
 CSV_FILE_NAME = "hdb_resale_flats.csv"
 if not os.path.exists(CSV_FILE_NAME):
-    st.error(f"⚠️ Dataset File Missing! Could not find '{CSV_FILE_NAME}' in your repository root.")
-    st.info("💡 Make sure you didn't name the file differently (e.g. capitalized .CSV).")
+    st.error(f"⚠️ Dataset File Missing! Could not locate '{CSV_FILE_NAME}' in your repository.")
     st.stop()
 
-# 3. Safe Import: Only import the engine AFTER the path environment is safely handled
+# 3. Dynamic import tracking to catch engine compilation errors
 try:
     from engine import RealEstateEngine
-except Exception as import_error:
-    st.error(f"❌ Failed to import engine script: {str(import_error)}")
+except Exception as e:
+    st.error(f"❌ Failed to import engine.py module structure: {str(e)}")
     st.stop()
 
-# 4. Setup the Caching Engine
+# 4. Safe cached engine initialization
 @st.cache_resource
 def load_hdb_engine():
     try:
-        # Pass the plain string filename since os.chdir() has fixed the root directory context
         engine = RealEstateEngine(CSV_FILE_NAME)
         engine.load_and_clean_data()
         return engine
     except Exception as e:
-        st.error(f"❌ Error during data layout cleaning: {str(e)}")
+        st.error(f"❌ Error during training engine data clean cycle: {str(e)}")
         st.stop()
 
-# 5. Initialize your app data frame variables safely
 engine = load_hdb_engine()
 cleaned_df = engine.df if hasattr(engine, 'df') else engine.load_and_clean_data()
+
+# --- Rest of your visual UI components go below ---
 
 # --- NEW: ADVANCED FEATURE ENGINEERING DIRECTLY IN APP ---
 # Helper function for floor midpoint calculation
