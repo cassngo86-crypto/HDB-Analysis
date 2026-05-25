@@ -12,6 +12,11 @@ from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder
 from sklearn.pipeline import Pipeline
 from sklearn.linear_model import Ridge
 
+st.set_page_config(
+    page_title="HDB Resale Analytics Kiosk",
+    layout="wide",  # This stretches your app across the whole screen, removing the empty space!
+    initial_sidebar_state="expanded"
+)
 # Configure accessible color palettes globally
 ACCESSIBLE_PALETTE = ["#0072B2", "#D55E00", "#009E73", "#CC79A7", "#E69F00"]
 
@@ -138,11 +143,14 @@ if raw_df is not None:
             """)
             
             # --- MAP ---
+            # --- MAP PORTAL WITH BOUNDARY LOCK ---
             st.write("---")
             st.subheader("🗺️ Geospatial Market Distribution Map")
+            
             if 'town_lat' in filtered_df.columns and 'town_lon' in filtered_df.columns:
                 map_data = filtered_df[['town_lat', 'town_lon']].dropna()
                 if not map_data.empty:
+                    # Python-side aggregation for high-speed delivery
                     aggregated_map_df = map_data.groupby(['town_lat', 'town_lon']).size().reset_index(name='transaction_count')
                     aggregated_map_df = aggregated_map_df.rename(columns={'town_lat': 'latitude', 'town_lon': 'longitude'})
                     
@@ -156,7 +164,21 @@ if raw_df is not None:
                         threshold=0.03,
                         pickable=False
                     )
-                    st.pydeck_chart(pdk.Deck(layers=[layer], initial_view_state=pdk.ViewState(latitude=1.3521, longitude=103.8198, zoom=10.8)))
+                    
+                    # Lock the visual component layout inside a dedicated container block
+                    with st.container():
+                        st.pydeck_chart(
+                            pdk.Deck(
+                                layers=[layer], 
+                                initial_view_state=pdk.ViewState(
+                                    latitude=1.3521, 
+                                    longitude=103.8198, 
+                                    zoom=10.8
+                                ),
+                                map_style="mapbox://styles/mapbox/dark-v9" # Dark style looks amazing with heatmaps!
+                            ),
+                            use_container_width=True # Forces the map to cleanly fill the wide layout
+                        )
             
             # --- PLOTLY ---
             st.write("---")
