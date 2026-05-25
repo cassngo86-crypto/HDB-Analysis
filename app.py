@@ -93,15 +93,14 @@ Machine Learning regression model to estimate current valuation parameters.
 """)
 st.write("---")
 
+
 # -----------------------------------------------------------------------------
-# 3. MACHINE LEARNING MODEL TRAINING PIPELINE (Step 3: Define the ML function)
+# 3. MACHINE LEARNING MODEL TRAINING PIPELINE (ORDINAL UPGRADE)
 # -----------------------------------------------------------------------------
-# -----------------------------------------------------------------------------
-# 3. MACHINE LEARNING MODEL TRAINING PIPELINE (UPGRADED VERSION)
-# -----------------------------------------------------------------------------
-@st.cache_resource(show_spinner="Training predictive regression model with vertical storeys...")
+from sklearn.preprocessing import OrdinalEncoder
+
+@st.cache_resource(show_spinner="Training predictive model with ordinal vertical metrics...")
 def train_prediction_model(df):
-    # Added 'storey_range' to your core features array
     features = ['town', 'flat_type', 'floor_area_sqm', 'lease_commence_date', 'storey_range']
     if not all(col in df.columns for col in features + ['resale_price']):
         return None, None
@@ -110,14 +109,21 @@ def train_prediction_model(df):
     X = model_df[features]
     y = model_df['resale_price']
     
-    # Categorical features that get One-Hot Encoded
-    categorical_features = ['town', 'flat_type', 'storey_range']
+    # 1. Define the explicit structural sequence of storey ranges found in your data
+    # Sorting them ensures lower floors get lower numbers, higher floors get higher numbers
+    unique_storeys = sorted(list(df['storey_range'].dropna().unique()))
+    
+    # 2. Separate categorical columns based on their encoding strategies
+    nominal_categorical = ['town', 'flat_type']  # Uses One-Hot Encoding (No inherent order)
+    ordinal_categorical = ['storey_range']       # Uses Ordinal Encoding (Strict sequence)
     numeric_features = ['floor_area_sqm', 'lease_commence_date']
     
+    # 3. Assemble the multidimensional data preprocessor pipeline
     preprocessor = ColumnTransformer(
         transformers=[
             ('num', 'passthrough', numeric_features),
-            ('cat', OneHotEncoder(handle_unknown='ignore'), categorical_features)
+            ('nom_cat', OneHotEncoder(handle_unknown='ignore'), nominal_categorical),
+            ('ord_cat', OrdinalEncoder(categories=[unique_storeys], handle_unknown='use_encoded_value', unknown_value=-1), ordinal_categorical)
         ])
     
     pipeline = Pipeline(steps=[
@@ -128,6 +134,8 @@ def train_prediction_model(df):
     pipeline.fit(X, y)
     r2_score = pipeline.score(X, y)
     return pipeline, r2_score
+
+# Re-trigger training on app start
 model_pipeline, model_r2 = train_prediction_model(raw_df)
 
 # -----------------------------------------------------------------------------
@@ -304,7 +312,7 @@ with tab2:
             
         st.write("---")
         
-        # Structure payload matching training dimensions
+        # Build DataFrame for prediction containing the integrated features
         input_data = pd.DataFrame([{
             'town': pred_town,
             'flat_type': pred_flat_type,
