@@ -125,9 +125,9 @@ if raw_df is not None:
     
     # --- TAB 1 LAYOUT ---
     with tab1:
-        st.subheader("📊 Cross-Sectional Market Performance Summary")
-        
         if not filtered_df.empty:
+            st.subheader("📊 Cross-Sectional Market Performance Summary")
+            
             total_volume = len(filtered_df)
             avg_price = filtered_df['resale_price'].mean()
             avg_psf = (filtered_df['resale_price'] / filtered_df['floor_area_sqm']).mean()
@@ -147,23 +147,57 @@ if raw_df is not None:
             > The most capital-intensive single transaction recorded sits in **{top_town}** commanding a peak market evaluation of **${top_val:,.2f} SGD**.
             """)
             
-            # --- MAP ---
-            # --- MAP PORTAL WITH BOUNDARY LOCK ---
-            # --- DIAGNOSTIC NATIVE MAP PORTAL ---
+            # --- MAP PORTAL ---
             st.write("---")
             st.subheader("🗺️ Geospatial Market Distribution Map")
-            
             if 'town_lat' in filtered_df.columns and 'town_lon' in filtered_df.columns:
-                # Isolate map metrics coordinates cleanly
                 map_df = filtered_df[['town_lat', 'town_lon']].dropna().rename(
                     columns={'town_lat': 'latitude', 'town_lon': 'longitude'}
                 )
-                
                 if not map_df.empty:
-                    # Native Streamlit map uses your browser's default mapbox engine safely
                     st.map(map_df, use_container_width=True)
                 else:
                     st.warning("⚠️ No valid geographical coordinates available for the selected data slice.")
+            
+            # --- 📈 RESTORED: PLOTLY CHARTS LOWER ROW ---
+            st.write("---")
+            st.subheader("📉 Statistical Market Distributions")
+            
+            # Split into two clean side-by-side columns spanning the full screen width
+            l_col1, l_col2 = st.columns(2)
+            
+            with l_col1:
+                st.markdown("### Resale Price Distribution by Town")
+                fig_box = px.box(
+                    filtered_df, 
+                    x='town', 
+                    y='resale_price', 
+                    color='town', 
+                    color_discrete_sequence=ACCESSIBLE_PALETTE,
+                    labels={'town': 'Town', 'resale_price': 'Price (SGD)'}
+                )
+                fig_box.update_layout(showlegend=False, xaxis_tickangle=-45, margin=dict(l=20, r=20, t=20, b=20))
+                st.plotly_chart(fig_box, use_container_width=True)
+                
+            with l_col2:
+                st.markdown("### Floor Area vs Resale Price Correlation")
+                fig_scatter = px.scatter(
+                    filtered_df, 
+                    x='floor_area_sqm', 
+                    y='resale_price', 
+                    color='flat_type', 
+                    color_discrete_sequence=ACCESSIBLE_PALETTE, 
+                    opacity=0.6,
+                    labels={'floor_area_sqm': 'Floor Area (sqm)', 'resale_price': 'Price (SGD)', 'flat_type': 'Flat Configuration'}
+                )
+                fig_scatter.update_layout(
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                    margin=dict(l=20, r=20, t=20, b=20)
+                )
+                st.plotly_chart(fig_scatter, use_container_width=True)
+                
+        else:
+            st.warning("⚠️ Adjust your sidebar criteria to populate corporate summary insights.")
             
     # --- TAB 2 LAYOUT ---
     with tab2:
