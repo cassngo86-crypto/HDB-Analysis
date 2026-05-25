@@ -161,36 +161,42 @@ with tab1:
         
 
 
+
         # ---------------------------------------------------------------------
-        # 5. DATA VISUALIZATION PORTALS (HIGH-PERFORMANCE GEOSPATIAL HEATMAP)
+        # 5. DATA VISUALIZATION PORTALS (PRE-AGGREGATED RUNTIME COLD REBOOT)
         # ---------------------------------------------------------------------
         st.write("---")
         st.subheader("🗺️ Geospatial Market Distribution Map")
         st.markdown("This thermal map dynamically tracks transaction density. Brighter, concentrated red zones indicate higher transaction volumes.")
         
         if 'town_lat' in filtered_df.columns and 'town_lon' in filtered_df.columns:
-            map_data = filtered_df[['town_lat', 'town_lon']].dropna().rename(
-                columns={'town_lat': 'latitude', 'town_lon': 'longitude'}
-            )
+            # 1. Drop missing rows early to keep arrays light
+            map_data = filtered_df[['town_lat', 'town_lon']].dropna()
             
             if not map_data.empty:
                 import pydeck as pdk
                 
-                # Using HeatmapLayer to handle stacked town coordinates perfectly
+                # 2. PYTHON-SIDE AGGREGATION: Group identical town coordinates first!
+                # This dramatically shrinks data size so PyDeck renders instantly without lagging.
+                aggregated_map_df = map_data.groupby(['town_lat', 'town_lon']).size().reset_index(name='transaction_count')
+                aggregated_map_df = aggregated_map_df.rename(columns={'town_lat': 'latitude', 'town_lon': 'longitude'})
+                
+                # 3. Configure the Heatmap Layer using the aggregated weight metrics
                 layer = pdk.Layer(
                     "HeatmapLayer",
-                    map_data,
+                    aggregated_map_df,
                     get_position=["longitude", "latitude"],
-                    radius_pixels=60,         # Determines how far the thermal glow spreads
-                    intensity=1.5,            # Controls the brightness scaling factor
-                    threshold=0.05,           # Keeps the outer edges looking clean
+                    get_weight="transaction_count", # Tell PyDeck to scale brightness based on our pre-counted volume
+                    radius_pixels=70,               # Smooth thermal glow distribution radius
+                    intensity=2.0,                  # Boost visibility for high volume areas
+                    threshold=0.01,
                     pickable=False
                 )
                 
                 view_state = pdk.ViewState(
-                    latitude=1.3521,           # Centered directly on Singapore
+                    latitude=1.3521,                 # Centered perfectly over Singapore
                     longitude=103.8198,
-                    zoom=11.0,
+                    zoom=10.8,
                     pitch=0
                 )
                 
