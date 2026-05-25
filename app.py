@@ -115,26 +115,28 @@ if raw_df is not None:
     ].copy()
     
     # =========================================================================
-    # STEP 4: GLOBAL SIDEBAR ENGINE & FILTER ASSIGNMENT
+    # STEP 4: GLOBAL SIDEBAR ENGINE & FILTER ASSIGNMENT (WITH UNIQUE KEYS)
     # =========================================================================
     st.sidebar.header("📊 Filter Options")
     
     selected_towns = st.sidebar.multiselect(
         "Select Towns:", 
         options=sorted(raw_df['town'].unique()), 
-        default=sorted(raw_df['town'].unique())[:3]
+        default=sorted(raw_df['town'].unique())[:3],
+        key="global_town_filter"  # <-- ADD THIS UNIQUE KEY
     )
     selected_flat_types = st.sidebar.multiselect(
         "Select Flat Types:", 
         options=sorted(raw_df['flat_type'].unique()), 
-        default=sorted(raw_df['flat_type'].unique())
+        default=sorted(raw_df['flat_type'].unique()),
+        key="global_flat_filter"  # <-- ADD THIS UNIQUE KEY
     )
     
     # Building filtered_df globally right here
     filtered_df = raw_df[
         (raw_df['town'].isin(selected_towns)) & 
         (raw_df['flat_type'].isin(selected_flat_types))
-    ]
+    ].copy()
     
     # =========================================================================
     # STEP 5: TABS NAVIGATION LAYER
