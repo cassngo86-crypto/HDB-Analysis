@@ -94,28 +94,8 @@ if raw_df is not None:
     # Always keep model training isolated on the raw copy
     model_pipeline, model_r2 = train_prediction_model(raw_df)
     
-    st.sidebar.header("📊 Filter Options")
-    
-    selected_towns = st.sidebar.multiselect(
-        "Select Towns:", 
-        options=sorted(raw_df['town'].unique()), 
-        default=sorted(raw_df['town'].unique())[:3]
-    )
-    selected_flat_types = st.sidebar.multiselect(
-        "Select Flat Types:", 
-        options=sorted(raw_df['flat_type'].unique()), 
-        default=sorted(raw_df['flat_type'].unique())
-    )
-    
-    # CRITICAL LOOP FIX: Create an explicit isolated copy of the filtered dataframe!
-    # This guarantees that working with data in the tabs won't trigger re-execution loops.
-    filtered_df = raw_df[
-        (raw_df['town'].isin(selected_towns)) & 
-        (raw_df['flat_type'].isin(selected_flat_types))
-    ].copy()
-    
     # =========================================================================
-    # STEP 4: GLOBAL SIDEBAR ENGINE & FILTER ASSIGNMENT (WITH UNIQUE KEYS)
+    # GLOBAL SIDEBAR ENGINE & FILTER ASSIGNMENT (KEEP THIS ONE)
     # =========================================================================
     st.sidebar.header("📊 Filter Options")
     
@@ -123,16 +103,16 @@ if raw_df is not None:
         "Select Towns:", 
         options=sorted(raw_df['town'].unique()), 
         default=sorted(raw_df['town'].unique())[:3],
-        key="global_town_filter"  # <-- ADD THIS UNIQUE KEY
+        key="global_town_filter"  
     )
     selected_flat_types = st.sidebar.multiselect(
         "Select Flat Types:", 
         options=sorted(raw_df['flat_type'].unique()), 
         default=sorted(raw_df['flat_type'].unique()),
-        key="global_flat_filter"  # <-- ADD THIS UNIQUE KEY
+        key="global_flat_filter"  
     )
     
-    # Building filtered_df globally right here
+    # Create an explicit isolated copy of the filtered dataframe to kill layout loops
     filtered_df = raw_df[
         (raw_df['town'].isin(selected_towns)) & 
         (raw_df['flat_type'].isin(selected_flat_types))
