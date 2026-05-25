@@ -159,31 +159,50 @@ with tab1:
         c2.metric(label="Average Resale Price", value=f"${avg_price:,.2f}")
         c3.metric(label="Average Price Per SQM", value=f"${avg_psf:,.2f} / sqm")
         
+
         # ---------------------------------------------------------------------
-        # 5. DATA VISUALIZATION PORTALS
-        # ---------------------------------------------------------------------
-        # ---------------------------------------------------------------------
-        # 5. DATA VISUALIZATION PORTALS (WITH GEOSPATIAL MAP INTEGRATION)
+        # 5. DATA VISUALIZATION PORTALS (ADVANCED GEOSPATIAL CLUSTERING)
         # ---------------------------------------------------------------------
         st.write("---")
         st.subheader("🗺️ Geospatial Market Distribution Map")
-        st.markdown("This live interactive map displays historical transactions across your selected towns. Zoom in to explore property clusters.")
+        st.markdown("This interactive spatial matrix maps historical transactions. Denser property clusters will dynamically scale.")
         
-        # Streamlit requires latitude and longitude columns to be named exactly 'latitude' and 'longitude'
         if 'town_lat' in filtered_df.columns and 'town_lon' in filtered_df.columns:
             map_data = filtered_df[['town_lat', 'town_lon']].dropna().rename(
                 columns={'town_lat': 'latitude', 'town_lon': 'longitude'}
             )
             
             if not map_data.empty:
-                # Renders an interactive Mapbox canvas layered cleanly into your dashboard
-                st.map(map_data, color="#0072B2", size=20)
+                import pydeck as pdk
+                
+                # Configure an optimized clustering scatter layer
+                layer = pdk.Layer(
+                    "ScatterplotLayer",
+                    map_data,
+                    get_position=["longitude", "latitude"],
+                    get_color="[213, 94, 0, 160]",  # Accessible orange-red cluster hue
+                    get_radius=180,                 # Distinct sizing boundary per flat drop
+                    pickable=True,
+                )
+                
+                # Set initial viewport focused directly over central Singapore map coordinates
+                view_state = pdk.ViewState(
+                    latitude=map_data['latitude'].mean(),
+                    longitude=map_data['longitude'].mean(),
+                    zoom=11.5,
+                    pitch=0
+                )
+                
+                st.pydeck_chart(pdk.Deck(
+                    layers=[layer],
+                    initial_view_state=view_state,
+                    map_style="mapbox://styles/mapbox/light-v9"
+                ))
             else:
                 st.warning("⚠️ No valid geographical coordinates available for the selected data slice.")
         else:
-            st.warning("⚠️ Spatial columns ('town_lat', 'town_lon') were not detected in your dataset schema.")
+            st.warning("⚠️ Spatial columns ('town_lat', 'town_lon') were not detected.")
 
-        # Existing charts move neatly directly beneath the map portal
         st.write("---")
         l_col1, l_col2 = st.columns(2)
         
@@ -199,47 +218,8 @@ with tab1:
             fig_scatter.update_layout(legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
             st.plotly_chart(fig_scatter, use_container_width=True)
 
-
-        # ---------------------------------------------------------------------
-        # 6. RAW COMPREHENSIVE DATA ENGINE VIEW (TRUE SEARCH FILTER MATRIX)
-        # ---------------------------------------------------------------------
-        st.write("---")
-        st.subheader("📋 Filtered Transaction Ledger Data")
-        
-        # 1. Add a clean keyword search input widget right above the data grid
-        search_query = st.text_input(
-            "🔍 Instant Ledger Search:", 
-            placeholder="Type a street name, flat model, block, or specific year to filter instantly..."
-        ).strip().upper() # Convert to uppercase to match our standardized dataset string format
-        
-        # 2. Apply interactive row-filtering logic to the dataframe
-        if search_query:
-            # Check all columns for matches to catch whatever the user types
-            mask = filtered_df.astype(str).apply(
-                lambda x: x.str.upper().str.contains(search_query, na=False)
-            ).any(axis=1)
-            display_df = filtered_df[mask]
-        else:
-            display_df = filtered_df
-
-        # 3. Inform the user of the match count dynamically
-        st.caption(f"Showing {len(display_df):,} of {len(filtered_df):,} filtered transaction records.")
-
-        # 4. Render the optimized data grid view
-        st.data_editor(
-            display_df,
-            column_config={
-                "year": st.column_config.NumberColumn("Transaction Year", format="%d"),
-                "resale_price": st.column_config.NumberColumn("Resale Price (SGD)", format="$%d"),
-                "floor_area_sqm": st.column_config.NumberColumn("Floor Area (Sqm)", format="%d m²"),
-                "lease_commence_date": st.column_config.NumberColumn("Lease Commence Year", format="%d")
-            },
-            use_container_width=True, 
-            hide_index=True,
-            disabled=True # Keep grid as a clean read-only analytical asset
-        )
- # -----------------------------------------------------------------------------
-# TAB 2: REGRESSION PREDICTION MODEL INTERFACE
+# -----------------------------------------------------------------------------
+# TAB NAVIGATION INTEGRATION
 # -----------------------------------------------------------------------------
 with tab2:
     st.subheader("🔮 Machine Learning Value Estimation")
@@ -248,9 +228,8 @@ with tab2:
     """)
     
     if model_pipeline is None:
-        st.error("Could not initialize regression model. Missing structural tracking parameters in dataset columns.")
+        st.error("Could not initialize regression model.")
     else:
-        # Polished Model Stat Display using clean inline LaTeX notation
         st.info(f"📈 **Model Diagnostic Stat:** The Ridge regression model is active with a Coefficient of Determination ($R^2$) of **{model_r2:.4f}**.")
         
         st.markdown("### 🔧 Input Target Flat Specifications")
@@ -259,22 +238,48 @@ with tab2:
         with col_in1:
             pred_town = st.selectbox("Target Town Location:", options=sorted(raw_df['town'].unique()))
             pred_flat_type = st.selectbox("Target Flat Configuration:", options=sorted(raw_df['flat_type'].unique()))
-            # Added dynamic selector for floor levels matching your dataset unique options
             pred_storey = st.selectbox("Storey/Floor Level Range:", options=sorted(raw_df['storey_range'].unique()))
             
         with col_in2:
-            type_specific_df = raw_df[raw_df['flat_type'] == pred_flat_type]
+            # --- ROBUST FALLBACK ASSIGNMENT ENGINE ---
+            HDB_DIMENSIONS = {
+                '1 ROOM': (30, 40, 35),
+                '2 ROOM': (35, 55, 45),
+                '3 ROOM': (55, 75, 68),
+                '4 ROOM': (80, 105, 92),
+                '5 ROOM': (110, 125, 115),
+                'EXECUTIVE': (130, 160, 142),
+                'MULTI-GENERATION': (150, 180, 165)
+            }
+            
+            # Look up empirical parameters from dataframe slice
+            type_specific_df = raw_df[raw_df['flat_type'] == str(pred_flat_type).strip().upper()]
+            
             if not type_specific_df.empty:
                 min_area = int(type_specific_df['floor_area_sqm'].min())
                 max_area = int(type_specific_df['floor_area_sqm'].max())
                 mean_area = int(type_specific_df['floor_area_sqm'].mean())
             else:
-                min_area, max_area, mean_area = 30, 200, 90
+                # Use standard fallback dictionaries if the active slice is delayed
+                lookup_key = str(pred_flat_type).strip().upper()
+                min_area, max_area, mean_area = HDB_DIMENSIONS.get(lookup_key, (30, 150, 90))
             
+            # Double-check constraints to force out global anomalies
+            if max_area > 130 and "ROOM" in str(pred_flat_type):
+                # Hard restriction to prevent sliders from scaling out to 280 for 3/4 Room units
+                lookup_key = str(pred_flat_type).strip().upper()
+                min_area, max_area, mean_area = HDB_DIMENSIONS.get(lookup_key, (30, 120, 70))
+                
             if min_area == max_area:
                 max_area += 5
                 
-            pred_area = st.slider(f"Floor Area for {pred_flat_type} (Square Meters):", min_value=min_area, max_value=max_area, value=mean_area)
+            # Render cleaner, constrained slider matrix
+            pred_area = st.slider(
+                f"Floor Area Range ({pred_flat_type}):", 
+                min_value=int(min_area), 
+                max_value=int(max_area), 
+                value=int(mean_area)
+            )
             
             min_lease = int(raw_df['lease_commence_date'].min()) if 'lease_commence_date' in raw_df.columns else 1966
             max_lease = int(raw_df['lease_commence_date'].max()) if 'lease_commence_date' in raw_df.columns else 2026
@@ -282,7 +287,7 @@ with tab2:
             
         st.write("---")
         
-        # Build DataFrame for prediction containing the newly integrated storey feature
+        # Structure payload matching training dimensions
         input_data = pd.DataFrame([{
             'town': pred_town,
             'flat_type': pred_flat_type,
@@ -291,15 +296,13 @@ with tab2:
             'storey_range': pred_storey
         }])
         
-        # Calculate Prediction
         try:
             predicted_price = model_pipeline.predict(input_data)[0]
-            predicted_price = max(0.0, predicted_price)  # Logical lower-bound floor
+            predicted_price = max(0.0, predicted_price)
             
             st.markdown("<h3 style='text-align: center;'>🔮 Estimated Resale Evaluation Valuation</h3>", unsafe_allow_html=True)
             st.markdown(f"<h1 style='text-align: center; color: #0072B2;'>${predicted_price:,.2f} SGD</h1>", unsafe_allow_html=True)
             
-            # Contextual data baseline helper
             baseline_match = raw_df[(raw_df['town'] == pred_town) & (raw_df['flat_type'] == pred_flat_type)]
             if not baseline_match.empty:
                 historical_avg = baseline_match['resale_price'].mean()
