@@ -148,20 +148,46 @@ if raw_df is not None:
             """)
             
             # --- MAP PORTAL ---
+            # --- HIGH-PERFORMANCE PRE-AGGREGATED MAP PORTAL ---
             st.write("---")
             st.subheader("🗺️ Geospatial Market Distribution Map")
+            
             if 'town_lat' in filtered_df.columns and 'town_lon' in filtered_df.columns:
-                map_df = filtered_df[['town_lat', 'town_lon']].dropna().rename(
-                    columns={'town_lat': 'latitude', 'town_lon': 'longitude'}
-                )
-                if not map_df.empty:
-                    st.map(map_df, use_container_width=True)
+                map_data = filtered_df[['town_lat', 'town_lon']].dropna()
+                
+                if not map_data.empty:
+                    # 1. PYTHON-SIDE AGGREGATION: Compresses tens of thousands of rows down to unique locations instantly
+                    aggregated_map_df = map_data.groupby(['town_lat', 'town_lon']).size().reset_index(name='transaction_count')
+                    aggregated_map_df = aggregated_map_df.rename(columns={'town_lat': 'latitude', 'town_lon': 'longitude'})
+                    
+                    # 2. LIGHTWEIGHT RENDER LAYER: Draws single points sized by volume
+                    layer = pdk.Layer(
+                        "ScatterplotLayer",
+                        aggregated_map_df,
+                        get_position=["longitude", "latitude"],
+                        get_color="[213, 94, 0, 160]",     # Accessible corporate orange
+                        get_radius="transaction_count * 1.5", # Circle expands based on transaction density
+                        radius_min_pixels=4,
+                        radius_max_pixels=30,
+                        pickable=True
+                    )
+                    
+                    # 3. BOUNDED CONTAINER: Keeps the WebGL map engine stable and kills layout loops
+                    with st.container():
+                        st.pydeck_chart(
+                            pdk.Deck(
+                                layers=[layer],
+                                initial_view_state=pdk.ViewState(
+                                    latitude=1.3521, 
+                                    longitude=103.8198, 
+                                    zoom=10.8
+                                ),
+                                map_style="mapbox://styles/mapbox/light-v9"
+                            ),
+                            use_container_width=True
+                        )
                 else:
                     st.warning("⚠️ No valid geographical coordinates available for the selected data slice.")
-            
-            # --- 📈 RESTORED: PLOTLY CHARTS LOWER ROW ---
-            st.write("---")
-            st.subheader("📉 Statistical Market Distributions")
             
             # Split into two clean side-by-side columns spanning the full screen width
             l_col1, l_col2 = st.columns(2)
