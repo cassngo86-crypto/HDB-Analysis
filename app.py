@@ -1,5 +1,5 @@
 # =============================================================================
-# STEP 1: GLOBAL IMPORTS
+# 1. GLOBAL CORE IMPORTS & CONFIGURATION (MUST BE TOP FIRST)
 # =============================================================================
 import streamlit as st
 import pandas as pd
@@ -12,27 +12,27 @@ from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder
 from sklearn.pipeline import Pipeline
 from sklearn.linear_model import Ridge
 
-# =============================================================================
-# 2. MANDATORY FIRST STREAMLIT INITIALIZATION (CRITICAL FOR RUNTIME FIX)
-# =============================================================================
-# This MUST sit completely above any data loading, functions, or sidebar logic!
 st.set_page_config(
     page_title="HDB Resale Analytics Kiosk",
-    layout="wide",                  # Maximizes monitor real estate, killing the side empty space
+    layout="wide",                  # Stretches the app to use the full screen layout
     initial_sidebar_state="expanded"
 )
 
-# Set up accessible styles globally right after initialization
 ACCESSIBLE_PALETTE = ["#0072B2", "#D55E00", "#009E73", "#CC79A7", "#E69F00"]
 
 # =============================================================================
-# 3. DEFINE CACHED DATA PIPELINE FUNCTIONS
+# 2. CACHED DATA PIPELINE (SAFE FROM MUTATION)
 # =============================================================================
 @st.cache_data(ttl=3600, show_spinner="Loading HDB transaction dataset...")
 def load_data(file_path):
     if not os.path.exists(file_path):
         return None
-    df = pd.read_csv(file_path)
+    
+    # Read raw data frame
+    base_df = pd.read_csv(file_path)
+    
+    # Create an explicit deep copy to avoid editing global cache vectors
+    df = base_df.copy()
     
     for col in ['town', 'flat_type', 'flat_model', 'storey_range', 'street_name']:
         if col in df.columns:
@@ -42,12 +42,13 @@ def load_data(file_path):
         df['year'] = df['month'].apply(lambda x: int(str(x).split('-')[0]) if '-' in str(x) else int(x))
         df = df.sort_values('month').reset_index(drop=True)
 
-    # Street-level neighborhood disperser matrix
+    # Street-level neighborhood jitter (Created safely on the copied data frame)
     if 'town_lat' in df.columns and 'town_lon' in df.columns and 'street_name' in df.columns:
         df['street_hash'] = df['street_name'].apply(lambda x: int(abs(hash(x))) % 1000 / 1000.0)
         df['town_lat'] = df['town_lat'] + (df['street_hash'] - 0.5) * 0.007
         df['town_lon'] = df['town_lon'] + (df['street_hash'] - 0.5) * 0.007
         df = df.drop(columns=['street_hash'])
+        
     return df
 
 
@@ -84,15 +85,34 @@ def train_prediction_model(df):
 
 
 # =============================================================================
-# STEP 3: RUN DATA PIPELINES (NOW SAFE TO CALL)
+# 3. RUN PIPELINES & SIDEBAR FILTER CONTROLS
 # =============================================================================
-# Ensure your actual filename matches your directory layout
-DATA_FILE = "hdb_resale_flats.csv" 
-
+DATA_FILE = "hdb_resale_prices.csv" 
 raw_df = load_data(DATA_FILE)
 
 if raw_df is not None:
+    # Always keep model training isolated on the raw copy
     model_pipeline, model_r2 = train_prediction_model(raw_df)
+    
+    st.sidebar.header("📊 Filter Options")
+    
+    selected_towns = st.sidebar.multiselect(
+        "Select Towns:", 
+        options=sorted(raw_df['town'].unique()), 
+        default=sorted(raw_df['town'].unique())[:3]
+    )
+    selected_flat_types = st.sidebar.multiselect(
+        "Select Flat Types:", 
+        options=sorted(raw_df['flat_type'].unique()), 
+        default=sorted(raw_df['flat_type'].unique())
+    )
+    
+    # CRITICAL LOOP FIX: Create an explicit isolated copy of the filtered dataframe!
+    # This guarantees that working with data in the tabs won't trigger re-execution loops.
+    filtered_df = raw_df[
+        (raw_df['town'].isin(selected_towns)) & 
+        (raw_df['flat_type'].isin(selected_flat_types))
+    ].copy()
     
     # =========================================================================
     # STEP 4: GLOBAL SIDEBAR ENGINE & FILTER ASSIGNMENT
@@ -147,49 +167,21 @@ if raw_df is not None:
             
             # --- MAP ---
             # --- MAP PORTAL WITH BOUNDARY LOCK ---
+            # --- DIAGNOSTIC NATIVE MAP PORTAL ---
             st.write("---")
             st.subheader("🗺️ Geospatial Market Distribution Map")
             
-            # --- HIGH PERFORMANCE COMPACT SPATIAL MATRIX ---
             if 'town_lat' in filtered_df.columns and 'town_lon' in filtered_df.columns:
-                map_data = filtered_df[['town_lat', 'town_lon']].dropna()
-                if not map_data.empty:
-                    # Group duplicates down instantly on the Python side
-                    aggregated_map_df = map_data.groupby(['town_lat', 'town_lon']).size().reset_index(name='transaction_count')
-                    aggregated_map_df = aggregated_map_df.rename(columns={'town_lat': 'latitude', 'town_lon': 'longitude'})
-                    
-                    # High-speed static scatterpoint layout tracking weights
-                    layer = pdk.Layer(
-                        "ScatterplotLayer",
-                        aggregated_map_df,
-                        get_position=["longitude", "latitude"],
-                        get_color="[213, 94, 0, 180]", # High-contrast accessible corporate orange
-                        # Dynamic radius: Higher transaction velocity = larger, distinct dots
-                        get_radius="transaction_count * 1.2", 
-                        radius_min_pixels=8,
-                        radius_max_pixels=60,
-                        pickable=True,
-                    )
-                    
-                    st.pydeck_chart(pdk.Deck(
-                        layers=[layer],
-                        initial_view_state=pdk.ViewState(latitude=1.3521, longitude=103.8198, zoom=10.8),
-                        map_style="mapbox://styles/mapbox/light-v9"
-                    ))
-            
-            # --- PLOTLY ---
-            st.write("---")
-            l_col1, l_col2 = st.columns(2)
-            with l_col1:
-                fig_box = px.box(filtered_df, x='town', y='resale_price', color='town', color_discrete_sequence=ACCESSIBLE_PALETTE)
-                fig_box.update_layout(showlegend=False, xaxis_tickangle=-45)
-                st.plotly_chart(fig_box, use_container_width=True)
-            with l_col2:
-                fig_scatter = px.scatter(filtered_df, x='floor_area_sqm', y='resale_price', color='flat_type', color_discrete_sequence=ACCESSIBLE_PALETTE, opacity=0.6)
-                fig_scatter.update_layout(legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
-                st.plotly_chart(fig_scatter, use_container_width=True)
-        else:
-            st.warning("⚠️ Adjust your sidebar criteria to populate corporate summary insights.")
+                # Isolate map metrics coordinates cleanly
+                map_df = filtered_df[['town_lat', 'town_lon']].dropna().rename(
+                    columns={'town_lat': 'latitude', 'town_lon': 'longitude'}
+                )
+                
+                if not map_df.empty:
+                    # Native Streamlit map uses your browser's default mapbox engine safely
+                    st.map(map_df, use_container_width=True)
+                else:
+                    st.warning("⚠️ No valid geographical coordinates available for the selected data slice.")
             
     # --- TAB 2 LAYOUT ---
     with tab2:
