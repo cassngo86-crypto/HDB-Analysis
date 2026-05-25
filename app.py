@@ -177,15 +177,33 @@ with tab1:
 
 
         # ---------------------------------------------------------------------
-        # 6. RAW COMPREHENSIVE DATA ENGINE VIEW (ADVANCED SEARCH & FILTER GRID)
+        # 6. RAW COMPREHENSIVE DATA ENGINE VIEW (TRUE SEARCH FILTER MATRIX)
         # ---------------------------------------------------------------------
         st.write("---")
         st.subheader("📋 Filtered Transaction Ledger Data")
-        st.markdown("*Use the **Search icon (🔍)** on the right corner of the grid to instantly filter rows by any keyword, town, or numeric value.*")
         
-        # Using st.data_editor to unlock interactive search controls natively
+        # 1. Add a clean keyword search input widget right above the data grid
+        search_query = st.text_input(
+            "🔍 Instant Ledger Search:", 
+            placeholder="Type a street name, flat model, block, or specific year to filter instantly..."
+        ).strip().upper() # Convert to uppercase to match our standardized dataset string format
+        
+        # 2. Apply interactive row-filtering logic to the dataframe
+        if search_query:
+            # Check all columns for matches to catch whatever the user types
+            mask = filtered_df.astype(str).apply(
+                lambda x: x.str.upper().str.contains(search_query, na=False)
+            ).any(axis=1)
+            display_df = filtered_df[mask]
+        else:
+            display_df = filtered_df
+
+        # 3. Inform the user of the match count dynamically
+        st.caption(f"Showing {len(display_df):,} of {len(filtered_df):,} filtered transaction records.")
+
+        # 4. Render the optimized data grid view
         st.data_editor(
-            filtered_df,
+            display_df,
             column_config={
                 "year": st.column_config.NumberColumn("Transaction Year", format="%d"),
                 "resale_price": st.column_config.NumberColumn("Resale Price (SGD)", format="$%d"),
@@ -194,9 +212,8 @@ with tab1:
             },
             use_container_width=True, 
             hide_index=True,
-            disabled=True # Keeps the data read-only so users don't accidentally edit it
+            disabled=True # Keep grid as a clean read-only analytical asset
         )
-
  # -----------------------------------------------------------------------------
 # TAB 2: REGRESSION PREDICTION MODEL INTERFACE
 # -----------------------------------------------------------------------------
