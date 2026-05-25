@@ -174,25 +174,27 @@ with tab1:
             fig_scatter.update_layout(legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
             st.plotly_chart(fig_scatter, use_container_width=True)
             
+
         # ---------------------------------------------------------------------
-        # 6. RAW COMPREHENSIVE DATA ENGINE VIEW
+        # 6. RAW COMPREHENSIVE DATA ENGINE VIEW (UPDATED WITH ADVANCED FILTERS)
         # ---------------------------------------------------------------------
         st.write("---")
         st.subheader("📋 Filtered Transaction Ledger Data")
+        st.markdown("*Use the filter icons on individual column headers below to search or drill down into specific data segments instantly.*")
+        
         st.dataframe(
             filtered_df,
             column_config={
+                "year": st.column_config.NumberColumn("Transaction Year", format="%d"), # Formats 2,012 into a clean 2012 year string
                 "resale_price": st.column_config.NumberColumn("Resale Price (SGD)", format="$%d"),
                 "floor_area_sqm": st.column_config.NumberColumn("Floor Area (Sqm)", format="%d m²"),
                 "lease_commence_date": st.column_config.NumberColumn("Lease Commence Year", format="%d")
             },
-            use_container_width=True, hide_index=True
+            use_container_width=True, 
+            hide_index=True
         )
-    else:
-        st.warning("⚠️ No records match selection filters. Please adjust your criteria.")
 
-# -----------------------------------------------------------------------------
-# ---------------------------------------------------------------------
+
  # -----------------------------------------------------------------------------
 # TAB 2: REGRESSION PREDICTION MODEL INTERFACE
 # -----------------------------------------------------------------------------
