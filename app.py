@@ -160,12 +160,13 @@ with tab1:
         c3.metric(label="Average Price Per SQM", value=f"${avg_psf:,.2f} / sqm")
         
 
-  # ---------------------------------------------------------------------
-        # 5. DATA VISUALIZATION PORTALS (TRUE GEOSPATIAL DENSITY CLUSTERING)
+
+        # ---------------------------------------------------------------------
+        # 5. DATA VISUALIZATION PORTALS (HIGH-PERFORMANCE GEOSPATIAL HEATMAP)
         # ---------------------------------------------------------------------
         st.write("---")
         st.subheader("🗺️ Geospatial Market Distribution Map")
-        st.markdown("This interactive spatial grid aggregates transaction density. Brighter, color-shifting zones represent higher volume hot spots.")
+        st.markdown("This thermal map dynamically tracks transaction density. Brighter, concentrated red zones indicate higher transaction volumes.")
         
         if 'town_lat' in filtered_df.columns and 'town_lon' in filtered_df.columns:
             map_data = filtered_df[['town_lat', 'town_lon']].dropna().rename(
@@ -175,25 +176,21 @@ with tab1:
             if not map_data.empty:
                 import pydeck as pdk
                 
-                # Using ScreenGridLayer to group perfectly overlapping coordinates by transaction volume
+                # Using HeatmapLayer to handle stacked town coordinates perfectly
                 layer = pdk.Layer(
-                    "ScreenGridLayer",
+                    "HeatmapLayer",
                     map_data,
                     get_position=["longitude", "latitude"],
-                    cell_size_pixels=40,   # Grouping radius for the stacked town transactions
-                    color_range=[
-                        [254, 237, 222, 180], # Low Density (Light Orange)
-                        [253, 190, 133, 200],
-                        [253, 141, 60, 220],
-                        [230, 85, 13, 240],   # High Density (Deep Orange-Red)
-                    ],
-                    pickable=True,
+                    radius_pixels=60,         # Determines how far the thermal glow spreads
+                    intensity=1.5,            # Controls the brightness scaling factor
+                    threshold=0.05,           # Keeps the outer edges looking clean
+                    pickable=False
                 )
                 
                 view_state = pdk.ViewState(
-                    latitude=1.3521,       # Center directly over Singapore geographic center
+                    latitude=1.3521,           # Centered directly on Singapore
                     longitude=103.8198,
-                    zoom=10.8,
+                    zoom=11.0,
                     pitch=0
                 )
                 
