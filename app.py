@@ -84,9 +84,13 @@ st.write("---")
 # -----------------------------------------------------------------------------
 # 3. MACHINE LEARNING MODEL TRAINING PIPELINE (Step 3: Define the ML function)
 # -----------------------------------------------------------------------------
-@st.cache_resource(show_spinner="Training predictive regression model...")
+# -----------------------------------------------------------------------------
+# 3. MACHINE LEARNING MODEL TRAINING PIPELINE (UPGRADED VERSION)
+# -----------------------------------------------------------------------------
+@st.cache_resource(show_spinner="Training predictive regression model with vertical storeys...")
 def train_prediction_model(df):
-    features = ['town', 'flat_type', 'floor_area_sqm', 'lease_commence_date']
+    # Added 'storey_range' to your core features array
+    features = ['town', 'flat_type', 'floor_area_sqm', 'lease_commence_date', 'storey_range']
     if not all(col in df.columns for col in features + ['resale_price']):
         return None, None
     
@@ -94,7 +98,8 @@ def train_prediction_model(df):
     X = model_df[features]
     y = model_df['resale_price']
     
-    categorical_features = ['town', 'flat_type']
+    # Categorical features that get One-Hot Encoded
+    categorical_features = ['town', 'flat_type', 'storey_range']
     numeric_features = ['floor_area_sqm', 'lease_commence_date']
     
     preprocessor = ColumnTransformer(
@@ -111,8 +116,6 @@ def train_prediction_model(df):
     pipeline.fit(X, y)
     r2_score = pipeline.score(X, y)
     return pipeline, r2_score
-
-# (Step 4: Now that raw_df AND the function exist, we can call it safely!)
 model_pipeline, model_r2 = train_prediction_model(raw_df)
 
 # -----------------------------------------------------------------------------
@@ -159,6 +162,28 @@ with tab1:
         # ---------------------------------------------------------------------
         # 5. DATA VISUALIZATION PORTALS
         # ---------------------------------------------------------------------
+        # ---------------------------------------------------------------------
+        # 5. DATA VISUALIZATION PORTALS (WITH GEOSPATIAL MAP INTEGRATION)
+        # ---------------------------------------------------------------------
+        st.write("---")
+        st.subheader("🗺️ Geospatial Market Distribution Map")
+        st.markdown("This live interactive map displays historical transactions across your selected towns. Zoom in to explore property clusters.")
+        
+        # Streamlit requires latitude and longitude columns to be named exactly 'latitude' and 'longitude'
+        if 'town_lat' in filtered_df.columns and 'town_lon' in filtered_df.columns:
+            map_data = filtered_df[['town_lat', 'town_lon']].dropna().rename(
+                columns={'town_lat': 'latitude', 'town_lon': 'longitude'}
+            )
+            
+            if not map_data.empty:
+                # Renders an interactive Mapbox canvas layered cleanly into your dashboard
+                st.map(map_data, color="#0072B2", size=20)
+            else:
+                st.warning("⚠️ No valid geographical coordinates available for the selected data slice.")
+        else:
+            st.warning("⚠️ Spatial columns ('town_lat', 'town_lon') were not detected in your dataset schema.")
+
+        # Existing charts move neatly directly beneath the map portal
         st.write("---")
         l_col1, l_col2 = st.columns(2)
         
@@ -173,7 +198,6 @@ with tab1:
             fig_scatter = px.scatter(filtered_df, x='floor_area_sqm', y='resale_price', color='flat_type', color_discrete_sequence=ACCESSIBLE_PALETTE, opacity=0.6)
             fig_scatter.update_layout(legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
             st.plotly_chart(fig_scatter, use_container_width=True)
-            
 
 
         # ---------------------------------------------------------------------
@@ -235,45 +259,36 @@ with tab2:
         with col_in1:
             pred_town = st.selectbox("Target Town Location:", options=sorted(raw_df['town'].unique()))
             pred_flat_type = st.selectbox("Target Flat Configuration:", options=sorted(raw_df['flat_type'].unique()))
+            # Added dynamic selector for floor levels matching your dataset unique options
+            pred_storey = st.selectbox("Storey/Floor Level Range:", options=sorted(raw_df['storey_range'].unique()))
             
         with col_in2:
-            # Filter dataset to extract ranges ONLY for the selected flat type
             type_specific_df = raw_df[raw_df['flat_type'] == pred_flat_type]
-            
             if not type_specific_df.empty:
                 min_area = int(type_specific_df['floor_area_sqm'].min())
                 max_area = int(type_specific_df['floor_area_sqm'].max())
                 mean_area = int(type_specific_df['floor_area_sqm'].mean())
             else:
-                # Safe fallback if empty
                 min_area, max_area, mean_area = 30, 200, 90
             
-            # Prevent Streamlit slider crash if min == max
             if min_area == max_area:
                 max_area += 5
                 
-            # Dynamic Slider: Range dynamically adjusts when flat type changes
-            pred_area = st.slider(
-                f"Floor Area for {pred_flat_type} (Square Meters):", 
-                min_value=min_area, 
-                max_value=max_area, 
-                value=mean_area
-            )
+            pred_area = st.slider(f"Floor Area for {pred_flat_type} (Square Meters):", min_value=min_area, max_value=max_area, value=mean_area)
             
-            # Lease slider constraints remain standard
             min_lease = int(raw_df['lease_commence_date'].min()) if 'lease_commence_date' in raw_df.columns else 1966
             max_lease = int(raw_df['lease_commence_date'].max()) if 'lease_commence_date' in raw_df.columns else 2026
-            
             pred_lease = st.slider("Lease Commencement Year:", min_value=min_lease, max_value=max_lease, value=max_lease-10)
             
         st.write("---")
         
-        # Build DataFrame for prediction matching pipeline schema requirements
+        # Build DataFrame for prediction containing the newly integrated storey feature
         input_data = pd.DataFrame([{
             'town': pred_town,
             'flat_type': pred_flat_type,
             'floor_area_sqm': pred_area,
-            'lease_commence_date': pred_lease
+            'lease_commence_date': pred_lease,
+            'storey_range': pred_storey
         }])
         
         # Calculate Prediction
