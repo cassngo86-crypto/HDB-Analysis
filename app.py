@@ -87,7 +87,7 @@ def train_prediction_model(df):
 # =============================================================================
 # 3. RUN PIPELINES & SIDEBAR FILTER CONTROLS
 # =============================================================================
-DATA_FILE = "hdb_resale_prices.csv" 
+DATA_FILE = "hdb_resale_flats.csv" 
 raw_df = load_data(DATA_FILE)
 
 if raw_df is not None:
