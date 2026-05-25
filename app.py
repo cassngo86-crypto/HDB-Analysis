@@ -34,7 +34,7 @@ def load_data(file_path):
     df = pd.read_csv(file_path)
     
     # Standard string format transformations
-    for col in ['town', 'flat_type', 'flat_model', 'storey_range']:
+    for col in ['town', 'flat_type', 'flat_model', 'storey_range', 'street_name']:
         if col in df.columns:
             df[col] = df[col].astype(str).str.upper().str.strip()
             
@@ -56,6 +56,18 @@ def load_data(file_path):
                 axis=1
             )
         df = df.drop(columns=['remaining_lease_clean'])
+
+    # --- 🗺️ NEW: STREET-LEVEL GEOSPATIAL AREA DISPERSER ---
+    # Adds a controlled spatial jitter based on street names so dots separate on zoom
+    if 'town_lat' in df.columns and 'town_lon' in df.columns and 'street_name' in df.columns:
+        import numpy as np
+        # Use a stable hash function based on street name to ensure the offset stays consistent
+        df['street_hash'] = df['street_name'].apply(lambda x: int(abs(hash(x))) % 1000 / 1000.0)
+        
+        # Disperse coords slightly within a tight ~500m street radius
+        df['town_lat'] = df['town_lat'] + (df['street_hash'] - 0.5) * 0.007
+        df['town_lon'] = df['town_lon'] + (df['street_hash'] - 0.5) * 0.007
+        df = df.drop(columns=['street_hash'])
         
     return df
 
@@ -160,8 +172,6 @@ with tab1:
         c3.metric(label="Average Price Per SQM", value=f"${avg_psf:,.2f} / sqm")
         
 
-
-
         # ---------------------------------------------------------------------
         # 5. DATA VISUALIZATION PORTALS (PRE-AGGREGATED RUNTIME COLD REBOOT)
         # ---------------------------------------------------------------------
@@ -181,15 +191,15 @@ with tab1:
                 aggregated_map_df = map_data.groupby(['town_lat', 'town_lon']).size().reset_index(name='transaction_count')
                 aggregated_map_df = aggregated_map_df.rename(columns={'town_lat': 'latitude', 'town_lon': 'longitude'})
                 
-                # 3. Configure the Heatmap Layer using the aggregated weight metrics
+                # Configure the Heatmap Layer with sharper street boundaries
                 layer = pdk.Layer(
                     "HeatmapLayer",
                     aggregated_map_df,
                     get_position=["longitude", "latitude"],
-                    get_weight="transaction_count", # Tell PyDeck to scale brightness based on our pre-counted volume
-                    radius_pixels=70,               # Smooth thermal glow distribution radius
-                    intensity=2.0,                  # Boost visibility for high volume areas
-                    threshold=0.01,
+                    get_weight="transaction_count", 
+                    radius_pixels=35,               # Dropped from 70 to 35 for precise street lines
+                    intensity=2.5,                  # Slightly boosted intensity for crisp contrast
+                    threshold=0.03,
                     pickable=False
                 )
                 
