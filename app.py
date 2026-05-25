@@ -175,25 +175,27 @@ with tab1:
             st.plotly_chart(fig_scatter, use_container_width=True)
             
 
+
         # ---------------------------------------------------------------------
-        # 6. RAW COMPREHENSIVE DATA ENGINE VIEW (UPDATED WITH ADVANCED FILTERS)
+        # 6. RAW COMPREHENSIVE DATA ENGINE VIEW (ADVANCED SEARCH & FILTER GRID)
         # ---------------------------------------------------------------------
         st.write("---")
         st.subheader("📋 Filtered Transaction Ledger Data")
-        st.markdown("*Use the filter icons on individual column headers below to search or drill down into specific data segments instantly.*")
+        st.markdown("*Use the **Search icon (🔍)** on the right corner of the grid to instantly filter rows by any keyword, town, or numeric value.*")
         
-        st.dataframe(
+        # Using st.data_editor to unlock interactive search controls natively
+        st.data_editor(
             filtered_df,
             column_config={
-                "year": st.column_config.NumberColumn("Transaction Year", format="%d"), # Formats 2,012 into a clean 2012 year string
+                "year": st.column_config.NumberColumn("Transaction Year", format="%d"),
                 "resale_price": st.column_config.NumberColumn("Resale Price (SGD)", format="$%d"),
                 "floor_area_sqm": st.column_config.NumberColumn("Floor Area (Sqm)", format="%d m²"),
                 "lease_commence_date": st.column_config.NumberColumn("Lease Commence Year", format="%d")
             },
             use_container_width=True, 
-            hide_index=True
+            hide_index=True,
+            disabled=True # Keeps the data read-only so users don't accidentally edit it
         )
-
 
  # -----------------------------------------------------------------------------
 # TAB 2: REGRESSION PREDICTION MODEL INTERFACE
