@@ -12,22 +12,26 @@ from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder
 from sklearn.pipeline import Pipeline
 from sklearn.linear_model import Ridge
 
+# =============================================================================
+# 2. MANDATORY FIRST STREAMLIT INITIALIZATION (CRITICAL FOR RUNTIME FIX)
+# =============================================================================
+# This MUST sit completely above any data loading, functions, or sidebar logic!
 st.set_page_config(
     page_title="HDB Resale Analytics Kiosk",
-    layout="wide",  # This stretches your app across the whole screen, removing the empty space!
+    layout="wide",                  # Maximizes monitor real estate, killing the side empty space
     initial_sidebar_state="expanded"
 )
-# Configure accessible color palettes globally
+
+# Set up accessible styles globally right after initialization
 ACCESSIBLE_PALETTE = ["#0072B2", "#D55E00", "#009E73", "#CC79A7", "#E69F00"]
 
 # =============================================================================
-# STEP 2: DEFINE FUNCTIONS FIRST (SO PYTHON KNOWS THEY EXIST)
+# 3. DEFINE CACHED DATA PIPELINE FUNCTIONS
 # =============================================================================
 @st.cache_data(ttl=3600, show_spinner="Loading HDB transaction dataset...")
 def load_data(file_path):
     if not os.path.exists(file_path):
         return None
-    
     df = pd.read_csv(file_path)
     
     for col in ['town', 'flat_type', 'flat_model', 'storey_range', 'street_name']:
@@ -38,13 +42,12 @@ def load_data(file_path):
         df['year'] = df['month'].apply(lambda x: int(str(x).split('-')[0]) if '-' in str(x) else int(x))
         df = df.sort_values('month').reset_index(drop=True)
 
-    # Street-level geospatial jitter matrix
+    # Street-level neighborhood disperser matrix
     if 'town_lat' in df.columns and 'town_lon' in df.columns and 'street_name' in df.columns:
         df['street_hash'] = df['street_name'].apply(lambda x: int(abs(hash(x))) % 1000 / 1000.0)
         df['town_lat'] = df['town_lat'] + (df['street_hash'] - 0.5) * 0.007
         df['town_lon'] = df['town_lon'] + (df['street_hash'] - 0.5) * 0.007
         df = df.drop(columns=['street_hash'])
-        
     return df
 
 
@@ -147,38 +150,32 @@ if raw_df is not None:
             st.write("---")
             st.subheader("🗺️ Geospatial Market Distribution Map")
             
+            # --- HIGH PERFORMANCE COMPACT SPATIAL MATRIX ---
             if 'town_lat' in filtered_df.columns and 'town_lon' in filtered_df.columns:
                 map_data = filtered_df[['town_lat', 'town_lon']].dropna()
                 if not map_data.empty:
-                    # Python-side aggregation for high-speed delivery
+                    # Group duplicates down instantly on the Python side
                     aggregated_map_df = map_data.groupby(['town_lat', 'town_lon']).size().reset_index(name='transaction_count')
                     aggregated_map_df = aggregated_map_df.rename(columns={'town_lat': 'latitude', 'town_lon': 'longitude'})
                     
+                    # High-speed static scatterpoint layout tracking weights
                     layer = pdk.Layer(
-                        "HeatmapLayer",
+                        "ScatterplotLayer",
                         aggregated_map_df,
                         get_position=["longitude", "latitude"],
-                        get_weight="transaction_count", 
-                        radius_pixels=35,               
-                        intensity=2.5,                  
-                        threshold=0.03,
-                        pickable=False
+                        get_color="[213, 94, 0, 180]", # High-contrast accessible corporate orange
+                        # Dynamic radius: Higher transaction velocity = larger, distinct dots
+                        get_radius="transaction_count * 1.2", 
+                        radius_min_pixels=8,
+                        radius_max_pixels=60,
+                        pickable=True,
                     )
                     
-                    # Lock the visual component layout inside a dedicated container block
-                    with st.container():
-                        st.pydeck_chart(
-                            pdk.Deck(
-                                layers=[layer], 
-                                initial_view_state=pdk.ViewState(
-                                    latitude=1.3521, 
-                                    longitude=103.8198, 
-                                    zoom=10.8
-                                ),
-                                map_style="mapbox://styles/mapbox/dark-v9" # Dark style looks amazing with heatmaps!
-                            ),
-                            use_container_width=True # Forces the map to cleanly fill the wide layout
-                        )
+                    st.pydeck_chart(pdk.Deck(
+                        layers=[layer],
+                        initial_view_state=pdk.ViewState(latitude=1.3521, longitude=103.8198, zoom=10.8),
+                        map_style="mapbox://styles/mapbox/light-v9"
+                    ))
             
             # --- PLOTLY ---
             st.write("---")
