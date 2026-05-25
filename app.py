@@ -160,12 +160,12 @@ with tab1:
         c3.metric(label="Average Price Per SQM", value=f"${avg_psf:,.2f} / sqm")
         
 
-        # ---------------------------------------------------------------------
-        # 5. DATA VISUALIZATION PORTALS (ADVANCED GEOSPATIAL CLUSTERING)
+  # ---------------------------------------------------------------------
+        # 5. DATA VISUALIZATION PORTALS (TRUE GEOSPATIAL DENSITY CLUSTERING)
         # ---------------------------------------------------------------------
         st.write("---")
         st.subheader("🗺️ Geospatial Market Distribution Map")
-        st.markdown("This interactive spatial matrix maps historical transactions. Denser property clusters will dynamically scale.")
+        st.markdown("This interactive spatial grid aggregates transaction density. Brighter, color-shifting zones represent higher volume hot spots.")
         
         if 'town_lat' in filtered_df.columns and 'town_lon' in filtered_df.columns:
             map_data = filtered_df[['town_lat', 'town_lon']].dropna().rename(
@@ -175,21 +175,25 @@ with tab1:
             if not map_data.empty:
                 import pydeck as pdk
                 
-                # Configure an optimized clustering scatter layer
+                # Using ScreenGridLayer to group perfectly overlapping coordinates by transaction volume
                 layer = pdk.Layer(
-                    "ScatterplotLayer",
+                    "ScreenGridLayer",
                     map_data,
                     get_position=["longitude", "latitude"],
-                    get_color="[213, 94, 0, 160]",  # Accessible orange-red cluster hue
-                    get_radius=180,                 # Distinct sizing boundary per flat drop
+                    cell_size_pixels=40,   # Grouping radius for the stacked town transactions
+                    color_range=[
+                        [254, 237, 222, 180], # Low Density (Light Orange)
+                        [253, 190, 133, 200],
+                        [253, 141, 60, 220],
+                        [230, 85, 13, 240],   # High Density (Deep Orange-Red)
+                    ],
                     pickable=True,
                 )
                 
-                # Set initial viewport focused directly over central Singapore map coordinates
                 view_state = pdk.ViewState(
-                    latitude=map_data['latitude'].mean(),
-                    longitude=map_data['longitude'].mean(),
-                    zoom=11.5,
+                    latitude=1.3521,       # Center directly over Singapore geographic center
+                    longitude=103.8198,
+                    zoom=10.8,
                     pitch=0
                 )
                 
