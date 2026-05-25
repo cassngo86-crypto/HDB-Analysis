@@ -79,7 +79,7 @@ def train_prediction_model(df):
 # STEP 3: RUN DATA PIPELINES (NOW SAFE TO CALL)
 # =============================================================================
 # Ensure your actual filename matches your directory layout
-DATA_FILE = "resale_prices.csv" 
+DATA_FILE = "hdb_resale_flats.csv" 
 
 raw_df = load_data(DATA_FILE)
 
